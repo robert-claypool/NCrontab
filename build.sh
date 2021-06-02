@@ -1,17 +1,26 @@
 #!/usr/bin/env bash
-[[ -e build.sh ]] || { echo >&2 "Please cd into the script location before running it."; exit 1; }
-which dotnet 2>/dev/null || {
-    echo>&2 .NET Core does not appear to be installed on this machine, which is
-    echo>&2 required to build the solution. You can install it from the URL below
-    echo>&2 and then try building again:
-    echo>&2 https://dot.net
-    exit 1
-}
-dotnet --info \
-&& dotnet restore \
-&& for p in NCrontab NCrontab.Signed NCrontab.Tests NCrontabConsole;
-    do for c in Debug Release; do {
-        dotnet build -c $c $p || exit
+set -e
+cd "$(dirname "$0")"
+for p in NCrontab NCrontab.Signed; do {
+    dotnet restore $p
+    for c in Debug Release; do {
+        for f in netstandard1.0 netstandard2.0; do {
+            dotnet build --no-restore -c $c -f $f $p
+        }
+        done
     }
     done
+}
+done
+for p in NCrontabConsole NCrontab.Tests; do {
+    dotnet restore $p
+}
+done
+for c in Debug Release; do {
+    dotnet build --no-restore -c $c -f net5 NCrontabConsole
+    for f in net5 netcoreapp3.1; do {
+        dotnet build --no-restore -c $c -f $f NCrontab.Tests
+    }
+    done
+}
 done

@@ -47,15 +47,17 @@ namespace NCrontab
         /// </summary>
 
         public static CrontabField Parse(CrontabFieldKind kind, string expression) =>
-            TryParse(kind, expression, v => v, e => { throw e(); });
+            TryParse(kind, expression, v => v, e => throw e());
 
-        public static CrontabField TryParse(CrontabFieldKind kind, string expression) =>
-            TryParse(kind, expression, v => v, _ => null);
+        public static CrontabField? TryParse(CrontabFieldKind kind, string expression) =>
+            TryParse(kind, expression, v => v, _ => (CrontabField?)null);
 
-        public static T TryParse<T>(CrontabFieldKind kind, string expression, Func<CrontabField, T> valueSelector, Func<ExceptionProvider, T> errorSelector)
+        public static T TryParse<T>(CrontabFieldKind kind, string expression,
+                                    Func<CrontabField, T> valueSelector,
+                                    Func<ExceptionProvider, T> errorSelector)
         {
             var field = new CrontabField(CrontabFieldImpl.FromKind(kind));
-            var error = field._impl.TryParse(expression, field.Accumulate, null, e => e);
+            var error = field._impl.TryParse(expression, field.Accumulate, (ExceptionProvider?)null, e => e);
             return error == null ? valueSelector(field) : errorSelector(error);
         }
 
@@ -103,12 +105,8 @@ namespace NCrontab
 
         CrontabField(CrontabFieldImpl impl)
         {
-            if (impl == null) throw new ArgumentNullException(nameof(impl));
-
-            _impl = impl;
+            _impl = impl ?? throw new ArgumentNullException(nameof(impl));
             _bits = new BitArray(impl.ValueCount);
-
-            _bits.SetAll(false);
             _minValueSet = int.MaxValue;
             _maxValueSet = -1;
         }
@@ -266,7 +264,7 @@ namespace NCrontab
 
         public override string ToString() => ToString(null);
 
-        public string ToString(string format)
+        public string ToString(string? format)
         {
             var writer = new StringWriter(CultureInfo.InvariantCulture);
 

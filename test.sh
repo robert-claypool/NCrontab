@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-[[ -e pack.sh ]] || { echo >&2 "Please cd into the script location before running it."; exit 1; }
-VERSION_SUFFIX=
-if [ ! -z "$1" ]; then VERSION_SUFFIX="--version-suffix $1"; fi
-./build.sh \
-&& dotnet test NCrontab.Tests
-
+set -e
+cd "$(dirname "$0")"
+./build.sh
+for f in net5 netcoreapp3.1; do {
+    dotnet test --no-build NCrontab.Tests -c Debug -f $f \
+        -p:CollectCoverage=true \
+        -p:CoverletOutputFormat=opencover \
+        -p:Exclude=[NUnit*]*
+    dotnet test --no-build NCrontab.Tests -c Release -f $f
+}
+done

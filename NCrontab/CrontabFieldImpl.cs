@@ -30,7 +30,7 @@ namespace NCrontab
 
     #endregion
 
-    delegate T CrontabFieldAccumulator<T>(int start, int end, int interval, T successs, Func<ExceptionProvider, T> onError);
+    delegate T CrontabFieldAccumulator<T>(int start, int end, int interval, T success, Func<ExceptionProvider, T> onError);
 
     // ReSharper disable once PartialTypeWithSinglePart
 
@@ -47,7 +47,7 @@ namespace NCrontab
 
         static readonly CompareInfo Comparer = CultureInfo.InvariantCulture.CompareInfo;
 
-        readonly string[] _names;
+        readonly string[]? _names; // TODO reconsider empty array == unnamed
 
         public static CrontabFieldImpl FromKind(CrontabFieldKind kind)
         {
@@ -57,10 +57,10 @@ namespace NCrontab
                 throw new ArgumentException($"Invalid crontab field kind. Valid values are {kinds}.", nameof(kind));
             }
 
-            return FieldByKind[(int) kind];
+            return FieldByKind[(int)kind];
         }
 
-        CrontabFieldImpl(CrontabFieldKind kind, int minValue, int maxValue, string[] names)
+        CrontabFieldImpl(CrontabFieldKind kind, int minValue, int maxValue, string[]? names)
         {
             Debug.Assert(Enum.IsDefined(typeof(CrontabFieldKind), kind));
             Debug.Assert(minValue >= 0);
@@ -129,8 +129,6 @@ namespace NCrontab
 
         void FormatValue(int value, TextWriter writer, bool noNames)
         {
-            Debug.Assert(writer != null);
-
             if (noNames || _names == null)
             {
                 if (value >= 0 && value < 100)
@@ -152,23 +150,23 @@ namespace NCrontab
         static void FastFormatNumericValue(int value, TextWriter writer)
         {
             Debug.Assert(value >= 0 && value < 100);
-            Debug.Assert(writer != null);
 
             if (value >= 10)
             {
-                writer.Write((char) ('0' + (value / 10)));
-                writer.Write((char) ('0' + (value % 10)));
+                writer.Write((char)('0' + (value / 10)));
+                writer.Write((char)('0' + (value % 10)));
             }
             else
             {
-                writer.Write((char) ('0' + value));
+                writer.Write((char)('0' + value));
             }
         }
 
-        public void Parse(string str, CrontabFieldAccumulator<ExceptionProvider> acc) =>
-            TryParse(str, acc, null, ep => { throw ep(); });
+        public void Parse(string str, CrontabFieldAccumulator<ExceptionProvider?> acc) =>
+            TryParse(str, acc, (ExceptionProvider?)null, ep => throw ep());
 
-        public T TryParse<T>(string str, CrontabFieldAccumulator<T> acc, T success, Func<ExceptionProvider, T> errorSelector)
+        public T TryParse<T>(string str, CrontabFieldAccumulator<T> acc, T success,
+                             Func<ExceptionProvider, T> errorSelector)
         {
             if (acc == null) throw new ArgumentNullException(nameof(acc));
 
@@ -189,20 +187,12 @@ namespace NCrontab
             }
         }
 
-        T OnParseException<T>(Exception innerException, string str, Func<ExceptionProvider, T> errorSelector)
-        {
-            Debug.Assert(str != null);
-            Debug.Assert(innerException != null);
-
-            return errorSelector(
-                       () => new CrontabException($"'{str}' is not a valid [{Kind}] crontab field expression.", innerException));
-        }
+        T OnParseException<T>(Exception innerException, string str, Func<ExceptionProvider, T> errorSelector) =>
+            errorSelector(
+                () => new CrontabException($"'{str}' is not a valid [{Kind}] crontab field expression.", innerException));
 
         T InternalParse<T>(string str, CrontabFieldAccumulator<T> acc, T success, Func<ExceptionProvider, T> errorSelector)
         {
-            Debug.Assert(str != null);
-            Debug.Assert(acc != null);
-
             if (str.Length == 0)
                 return errorSelector(() => new CrontabException("A crontab field value cannot be empty."));
 
@@ -215,7 +205,7 @@ namespace NCrontab
             if (commaIndex > 0)
             {
                 var result = success;
-                using (var token = ((IEnumerable<string>) str.Split(StringSeparatorStock.Comma)).GetEnumerator())
+                using (var token = ((IEnumerable<string>)str.Split(StringSeparatorStock.Comma)).GetEnumerator())
                 {
                     while (token.MoveNext() && result == null)
                         result = InternalParse(token.Current, acc, success, errorSelector);
@@ -241,7 +231,7 @@ namespace NCrontab
             // Next, look for wildcard (*).
             //
 
-            if (str.Length == 1 && str[0]== '*')
+            if (str.Length == 1 && str[0] == '*')
             {
                 return acc(-1, -1, every ?? 1, success, errorSelector);
             }
@@ -275,8 +265,6 @@ namespace NCrontab
 
         int ParseValue(string str)
         {
-            Debug.Assert(str != null);
-
             if (str.Length == 0)
                 throw new CrontabException("A crontab field value cannot be empty.");
 
